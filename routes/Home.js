@@ -154,20 +154,47 @@ wss.on('connection', ws => {
   ws.send(JSON.stringify({ message: 'Connection successful!' }));
   
   ws.on('message', message => {
-    let payload = JSON.parse(message);
-    const { token } = payload;
-    const { role, id } = jwt.verify(token, process.env.JWT_SECRET); // Verify the JWT token
-    console.log(token, role, id)
-    console.log(captainClients, userClients)
-    console.log(payload)
+  let payload = JSON.parse(message);
+  const { token } = payload;
+  const { role, id } = jwt.verify(token, process.env.JWT_SECRET); // Verify the JWT token
+  console.log(token, role, id)
+  console.log(captainClients, userClients)
+  console.log(payload)
+// Check role to determine who is connecting (captain, user, or admin)
+if (role === 'captain') {
+  captainClients.set(id, ws);
 
-    if (role === 'captain') {
-        captainClients.set(id, ws);
-        if (payload.location) {
-            ws.location = payload.location;
-            notifyUsersAndAdmins(id, ws.location);
-        }
-    } else if (role === 'user') {
+  // Update location if provided
+  if (payload.location) {
+    ws.location = payload.location;
+
+    // Notify all admin clients about this captain's location
+    adminClients.forEach(adminWs => {
+      if (adminWs.readyState === WebSocket.OPEN) {
+        adminWs.send(JSON.stringify({ captainId: id, location: ws.location }));
+      }
+    });
+
+    // Notify the main user and all passenger users with a recent order associated with this captain
+    TaxiOrder.find({ captain: id, cancelled: false }).sort('-createdAt')
+      .limit(1)
+      .exec((err, orders) => {
+        if (err) return console.error(err);
+        if (orders.length === 0) return;
+
+        let order = orders[0];
+
+        // Send location to main user
+        let userId = order.user;
+        sendLocationToUser(userId, id, ws.location);
+
+        // Send location to all passengers
+        order.passengers.forEach(passenger => {
+          sendLocationToUser(passenger.user, id, ws.location);
+        });
+      });
+  }
+} else if (role === 'user') {
   userClients.set(id, ws);
   ws.send(JSON.stringify({ message: 'User added successfully!' }));
 
@@ -202,31 +229,6 @@ wss.on('connection', ws => {
   }
   ws.send(JSON.stringify(locations));
 }});
-function notifyUsersAndAdmins(captainId, location) {
-  // Notify all admin clients about this captain's location
-  adminClients.forEach(adminWs => {
-      if (adminWs.readyState === WebSocket.OPEN) {
-          adminWs.send(JSON.stringify({ captainId: captainId, location: location }));
-      }
-  });
-
-  // Notify the main user and all passenger users with a recent order associated with this captain
-  TaxiOrder.find({ captain: captainId, cancelled: false }).sort('-createdAt')
-      .limit(1)
-      .exec((err, orders) => {
-          if (err) return console.error(err);
-          if (orders.length === 0) return;
-
-          let order = orders[0];
-          let userId = order.user;
-          sendLocationToUser(userId, captainId, location);
-
-          // Send location to all passengers
-          order.passengers.forEach(passenger => {
-              sendLocationToUser(passenger.user, captainId, location);
-          });
-      });
-}
 
   ws.on('close', () => {
       for (let [captainId, captainWs] of captainClients.entries()) {
