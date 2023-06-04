@@ -200,24 +200,6 @@ wss.on('connection', ws => {
       userClients.set(id, ws);
       ws.send(JSON.stringify({ message: 'User added successfully!' }));
 
-      // Find any active (non-cancelled) orders for this user
-      TaxiOrder.find({ user: id, cancelled: false }).sort('-createdAt')
-        .limit(1)
-        .exec((err, orders) => {
-          if (err) return console.error(err);
-          if (orders.length === 0) return;
-
-          let order = orders[0];
-          let captainId = order.captain;
-
-          // Find the captain's WebSocket
-          let captainWs = captainClients.get(captainId.toString());
-
-          // If the captain's WebSocket is open and the location is known, send the location to the user
-          if (captainWs && captainWs.readyState === WebSocket.OPEN && captainWs.location) {
-            ws.send(JSON.stringify({ captainId: captainId, location: captainWs.location }));
-          }
-        });
     } else if (role === 'admin') {
       adminClients.push(ws);
 
@@ -263,6 +245,7 @@ function sendLocationToUser(userId, captainId, location) {
     // The user's WebSocket is not open, so do nothing
   }
 }
+
 
 
 
