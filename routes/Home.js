@@ -162,43 +162,40 @@ wss.on('connection', ws => {
   console.log(payload)
 // Check role to determine who is connecting (captain, user, or admin)
 if (role === 'captain') {
-  ws.on('message', message => {
-    let payload = JSON.parse(message);
+  captainClients.set(id, ws);
 
-    // Check if a new location is included in the message
-    if (payload.newLocation) {
-        ws.location = payload.newLocation;
+  // Update location if provided
+  if (payload.location) {
+    ws.location = payload.location;
 
-        // Notify all admin clients about this captain's location
-        adminClients.forEach(adminWs => {
-            if (adminWs.readyState === WebSocket.OPEN) {
-                adminWs.send(JSON.stringify({ captainId: id, location: ws.location }));
-            }
+    // Notify all admin clients about this captain's location
+    adminClients.forEach(adminWs => {
+      if (adminWs.readyState === WebSocket.OPEN) {
+        adminWs.send(JSON.stringify({ captainId: id, location: ws.location }));
+      }
+    });
+
+    // Notify the main user and all passenger users with a recent order associated with this captain
+    TaxiOrder.find({ captain: id, cancelled: false }).sort('-createdAt')
+      .limit(1)
+      .exec((err, orders) => {
+        if (err) return console.error(err);
+        if (orders.length === 0) return;
+
+        let order = orders[0];
+
+        // Send location to main user
+        let userId = order.user;
+        sendLocationToUser(userId, id, ws.location);
+
+        // Send location to all passengers
+        order.passengers.forEach(passenger => {
+          sendLocationToUser(passenger.user, id, ws.location);
         });
-
-        // Notify the main user and all passenger users with a recent order associated with this captain
-        TaxiOrder.find({ captain: id, cancelled: false }).sort('-createdAt')
-            .limit(1)
-            .exec((err, orders) => {
-                if (err) return console.error(err);
-                if (orders.length === 0) return;
-
-                let order = orders[0];
-
-                // Send location to main user
-                let userId = order.user;
-                sendLocationToUser(userId, id, ws.location);
-
-                // Send location to all passengers
-                order.passengers.forEach(passenger => {
-                    sendLocationToUser(passenger.user, id, ws.location);
-                });
-            });
-    }
-});
-
+      });
+  }
 } else if (role === 'user') {
-  userClients.set(id, ws);
+   userClients.set(id, ws);
   ws.send(JSON.stringify({ message: 'User added successfully!' }));
 
   // Find any active (non-cancelled) orders for this user
