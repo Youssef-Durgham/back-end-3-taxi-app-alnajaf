@@ -151,13 +151,15 @@ let userClients = new Map(); // {userId: ws}
 let adminClients = []; // List of admin clients
 wss.on('connection', ws => {
   console.log(captainClients,userClients)
+  
   ws.on('message', message => {
       let payload = JSON.parse(message);
       const { token } = payload;
       const { role, id } = jwt.verify(token, process.env.JWT_SECRET); // Verify the JWT token
-console.log(token, role, id)
-console.log(captainClients,userClients)
-console.log(payload)
+      console.log(token, role, id)
+      console.log(captainClients,userClients)
+      console.log(payload)
+
       // Check role to determine who is connecting (captain, user, or admin)
       if (role === 'captain') {
           captainClients.set(id, ws);
@@ -194,6 +196,26 @@ console.log(payload)
           }
       } else if (role === 'user') {
           userClients.set(id, ws);
+
+          // Find any active (non-cancelled) orders for this user
+          TaxiOrder.find({ user: id, cancelled: false }).sort('-createdAt')
+            .limit(1)
+            .exec((err, orders) => {
+                if (err) return console.error(err);
+                if (orders.length === 0) return;
+
+                let order = orders[0];
+                let captainId = order.captain;
+
+                // Find the captain's WebSocket
+                let captainWs = captainClients.get(captainId.toString());
+
+                // If the captain's WebSocket is open and the location is known, send the location to the user
+                if (captainWs && captainWs.readyState === WebSocket.OPEN && captainWs.location) {
+                    ws.send(JSON.stringify({ captainId: captainId, location: captainWs.location }));
+                }
+            });
+
       } else if (role === 'admin') {
           adminClients.push(ws);
 
