@@ -252,19 +252,20 @@ let order = TaxiOrder.find({ captain: id, cancelled: false })
       ws.send(JSON.stringify(locations));
     }
   });
-
-  for (let [captainId, captainWs] of captainClients.entries()) {
-    if (ws === captainWs) {
-      captainClients.delete(captainId);
-    }
-  }
   
-  for (let [userId, userWs] of userClients.entries()) {
-    if (ws === userWs) {
-      userClients.delete(userId);
+  ws.on('close', () => {
+    for (let [captainId, captainWs] of captainClients.entries()) {
+      if (ws === captainWs) {
+        captainClients.delete(captainId);
+      }
     }
-  }
-  
+    
+    for (let [userId, userWs] of userClients.entries()) {
+      if (ws === userWs) {
+        userClients.delete(userId);
+      }
+    }
+  });
 });
 
 
