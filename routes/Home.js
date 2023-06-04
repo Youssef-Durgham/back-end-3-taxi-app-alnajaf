@@ -195,7 +195,7 @@ if (role === 'captain') {
       });
   }
 } else if (role === 'user') {
-   userClients.set(id, ws);
+  userClients.set(id, ws);
   ws.send(JSON.stringify({ message: 'User added successfully!' }));
 
   // Find any active (non-cancelled) orders for this user
