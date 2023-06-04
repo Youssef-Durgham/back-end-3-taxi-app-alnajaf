@@ -174,14 +174,13 @@ if (role === 'captain') {
       if (orders.length === 0) return;
       let order = orders[0];
       let userId = order.user;
-      sendLocationToUser(userId, id, ws.location);
-
-      // Send location to all passengers
-      order.passengers.forEach(passenger => {
-        sendLocationToUser(passenger.user, id, ws.location);
-      });
+      // Check if the user has an active order with this captain
+      if (userClients.has(userId)) {
+        // Send the location to the user
+        sendLocationToUser(userId, id, ws.location);
+      }
     });
-}
+  }
 
 } else if (role === 'user') {
   userClients.set(id, ws);
@@ -245,11 +244,15 @@ let userWs = userClients.get(userId.toString());
 
 // If the user's WebSocket is open, send the captain's location to the user
 if (userWs && userWs.readyState === WebSocket.OPEN) {
-userWs.send(JSON.stringify({ captainId: captainId, location: location }));
+  userWs.send(JSON.stringify({
+    captainId: captainId,
+    location: location
+  }));
 } else {
-// The user's WebSocket is not open, so do nothing
+  // The user's WebSocket is not open, so do nothing
 }
 }
+
 
 
 
