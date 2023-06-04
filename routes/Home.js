@@ -151,6 +151,7 @@ let userClients = new Map(); // {userId: ws}
 let adminClients = []; // List of admin clients
 wss.on('connection', ws => {
   console.log(captainClients,userClients)
+  ws.send(JSON.stringify({ message: 'Connection successful!' }));
   
   ws.on('message', message => {
       let payload = JSON.parse(message);
