@@ -213,12 +213,9 @@ if (role === 'captain') {
 
       // If the captain's WebSocket is open and the location is known, send the location to the user
       if (captainWs && captainWs.readyState === WebSocket.OPEN && captainWs.location) {
-        while (captainWs.readyState === WebSocket.OPEN && captainWs.location) {
-          ws.send(JSON.stringify({ captainId: captainId, location: captainWs.location }));
-        }
+        ws.send(JSON.stringify({ captainId: captainId, location: captainWs.location }));
       }
     });
-
 } else if (role === 'admin') {
   adminClients.push(ws);
 
