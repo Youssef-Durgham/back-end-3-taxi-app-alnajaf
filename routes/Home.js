@@ -165,7 +165,21 @@ wss.on('connection', ws => {
     // Check role to determine who is connecting (captain, user, or admin)
     if (role === 'captain') {
       captainClients.set(id, ws);
+// Notify the user associated with the most recent order of this captain's location
+let order = TaxiOrder.find({ captain: id, cancelled: false })
+  .sort('-createdAt')
+  .limit(1)
+  .exec((err, orders) => {
+    if (err) return console.error(err);
+    if (orders.length === 0) return;
 
+    let order = orders[0];
+    let userId = order.user;
+    let userWs = userClients.get(userId.toString());
+    if (userWs && userWs.readyState === WebSocket.OPEN) {
+      userWs.send(JSON.stringify({ captainId: id, location: ws.location }));
+    }
+  });
       // Update location if provided
       if (payload.location) {
         ws.location = payload.location;
@@ -239,24 +253,18 @@ wss.on('connection', ws => {
     }
   });
 
-  ws.on('close', () => {
-    for (let [captainId, captainWs] of captainClients.entries()) {
-      if (ws === captainWs) {
-        captainClients.delete(captainId);
-      }
+  for (let [captainId, captainWs] of captainClients.entries()) {
+    if (ws === captainWs) {
+      captainClients.delete(captainId);
     }
-
-    for (let [userId, userWs] of userClients.entries()) {
-      if (ws === userWs) {
-        userClients.delete(userId);
-      }
+  }
+  
+  for (let [userId, userWs] of userClients.entries()) {
+    if (ws === userWs) {
+      userClients.delete(userId);
     }
-
-    let adminIndex = adminClients.indexOf(ws);
-    if (adminIndex !== -1) {
-      adminClients.splice(adminIndex, 1);
-    }
-  });
+  }
+  
 });
 
 
