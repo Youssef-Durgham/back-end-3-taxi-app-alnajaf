@@ -252,7 +252,7 @@ if (role === 'captain') {
 
 // Helper function to send location to a user
 function sendLocationToUser(userId, captainId, location) {
-  let userWs = userClients.get(userId.toString());
+  let userWs = userClients.get(userId);
 
   // If the user's WebSocket is open, send the captain's location to the user
 
