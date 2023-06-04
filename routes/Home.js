@@ -154,9 +154,9 @@ console.log(captainClients, userClients);
 ws.send(JSON.stringify({ message: 'Connection successful!' }));
 
 ws.on('message', message => {
-let payload = JSON.parse(message);
-const { token } = payload;
-const { role, id } = jwt.verify(token, process.env.JWT_SECRET); // Verify the JWT token
+  let payload = JSON.parse(message);
+  const { token } = payload;
+  const { role, id } = jwt.verify(token, process.env.JWT_SECRET); // Verify the JWT token
 console.log(token, role, id)
 console.log(captainClients, userClients)
 console.log(payload)
@@ -177,23 +177,24 @@ if (role === 'captain') {
 
     // Notify the main user and all passenger users with a recent order associated with this captain
     TaxiOrder.find({ captain: id, cancelled: false }).sort('-createdAt')
-      .limit(1)
-      .exec((err, orders) => {
-        if (err) return console.error(err);
-        if (orders.length === 0) return;
+    .limit(1)
+    .exec((err, orders) => {
+      if (err) return console.error(err);
+      if (orders.length === 0) return;
 
-        let order = orders[0];
+      let order = orders[0];
 
-        // Send location to main user
-        let userId = order.user;
-        sendLocationToUser(userId, id, ws.location);
+      // Send location to main user
+      let userId = order.user;
+      sendLocationToUser(userId, id, ws.location);
 
-        // Send location to all passengers
-        order.passengers.forEach(passenger => {
-          sendLocationToUser(passenger.user, id, ws.location);
-        });
+      // Send location to all passengers
+      order.passengers.forEach(passenger => {
+        sendLocationToUser(passenger.user, id, ws.location);
       });
-  }
+    });
+}
+
 } else if (role === 'user') {
   userClients.set(id, ws);
   ws.send(JSON.stringify({ message: 'User added successfully!' }));
