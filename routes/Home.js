@@ -150,11 +150,13 @@ let captainClients = new Map(); // {captainId: ws}
 let userClients = new Map(); // {userId: ws}
 let adminClients = []; // List of admin clients
 wss.on('connection', ws => {
+  console.log(captainClients,userClients)
   ws.on('message', message => {
       let payload = JSON.parse(message);
       const { token } = payload;
       const { role, id } = jwt.verify(token, process.env.JWT_SECRET); // Verify the JWT token
 console.log(token, role, id)
+console.log(captainClients,userClients)
 console.log(payload)
       // Check role to determine who is connecting (captain, user, or admin)
       if (role === 'captain') {
