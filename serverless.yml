@@ -1,0 +1,52 @@
+service: fodo-last-3
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  region: me-south-1
+  memorySize: 3008
+  timeout: 900
+  
+
+custom:
+  esbuild:
+    external:
+      - sharp
+    packagerOptions:
+      scripts:
+        - npm install --arch=x64 --platform=linux sharp
+    deploymentBucket:
+      name: taxi-app-najaf
+      
+
+functions:
+  main:
+    handler: index.handler
+    environment:
+      MONGO_URL: "mongodb+srv://yusifdhrgam:Qwertly123@cluster0.t9peqde.mongodb.net/test"
+      TOKEN_SECRET: "laksj24501dhfgpqowieu578rytmznxbcvql32gotbvjfpqotnvm654xsdrtpldkfjgutewuvnbmxs"
+      ADMIN_SECRET_KEY: "FoodoYusif123@"
+      JWT_SECRET: "1234567890"
+      TWILIO_ACCOUNT_SID: "AC910896cde4bfb662ca9fe076b02536e7"
+      TWILIO_AUTH_TOKEN: "5ce307ff197422b1b5f97849f4e5db2c"
+      TWILIO_PHONE_NUMBER: "+13466666692"
+      TWILIO_WHATSAPP_PHONE: "+14155238886"
+      EMAIL_USERNAME: "yusifdhrgamtrt@gmail.com"
+      EMAIL_PASSWORD: "lzjnrolzwuspywug"
+      ACCESS_KEY: "AKIAVCZ3WWWGPXVCKJBA"
+      SECRET_ACCESS_KEY: "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"
+      AWS_NAME: "codellab"
+      FB_GRAPH_API_TOKEN: "EAAIE6J8ewBUBANQt5nEBIURGdgjURdMs3e9A78qWt1uOMOyfThvjSdgoz0q6ZC2ZBNuZCmba7SNRlpWFdeLuLylMEIrLlkxZAmSjKiZAQyr2uVwvJjytGFZBRnywQUbudJBfxQXWx3rCyOZBscmiWlnrbTswIZAWZAZAsDDbsR8lwqNar58Q9swAfNnZB4xUOvQ8BwURyJUAy0wFgZDZD"
+      VIBER_AUTH_TOKEN: "50ae4cd97ca7e5c1-27076050a42dc54c-de9a63fa03059af1"
+      TELEGRAM_BOT_TOKEN: "5612346036:AAGb0txW0SPrQSToEIQODxI_gMEdVCMJKWs"
+      PM2_HOME: ~/.pm2
+    events:
+    - websocket:
+          route: $default
+    - websocket:
+          route: $connect
+    - websocket:
+          route: $disconnect
+    - http:
+         path: /{proxy+}
+         method: ANY
