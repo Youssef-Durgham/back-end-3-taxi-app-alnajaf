@@ -149,6 +149,7 @@ router.post('/send-notification', auth, async (req, res) => {
 let captainClients = new Map(); // {captainId: ws}
 let userClients = new Map(); // {userId: ws}
 let adminClients = []; // List of admin clients
+let captainLocations = new Map(); // {captainId: location}
 
 wss.on('connection', ws => {
   console.log(captainClients, userClients);
@@ -162,85 +163,32 @@ wss.on('connection', ws => {
     console.log(captainClients, userClients)
     console.log(payload)
 
-    // Check role to determine who is connecting (captain, user, or admin)
     if (role === 'captain') {
       captainClients.set(id, ws);
     
       // Update location if provided
       if (payload.location) {
-        ws.location = payload.location;
+        captainLocations.set(id, payload.location);
     
         // Notify all admin clients about this captain's location
         adminClients.forEach(adminWs => {
           if (adminWs.readyState === WebSocket.OPEN) {
-            adminWs.send(JSON.stringify({ captainId: id, location: ws.location }));
+            adminWs.send(JSON.stringify({ captainId: id, location: payload.location }));
           }
         });
-    
-        // Notify the main user and all passenger users with a recent order associated with this captain
-        TaxiOrder.find({ captain: id, cancelled: false })
-          .sort('-createdAt')
-          .limit(1)
-          .exec((err, orders) => {
-            if (err) return console.error(err);
-            if (orders.length === 0) return;
-    
-            let order = orders[0];
-    
-            // Send location to main user
-            let userId = order.user;
-            let userWs = userClients.get(userId.toString());
-            if (userWs && userWs.readyState === WebSocket.OPEN) {
-              userWs.send(JSON.stringify({ captainId: id, location: ws.location }));
-            }
-    
-            // Send location to all passengers
-            order.passengers.forEach(passenger => {
-              let passengerUserWs = userClients.get(passenger.user.toString());
-              if (passengerUserWs && passengerUserWs.readyState === WebSocket.OPEN) {
-                passengerUserWs.send(JSON.stringify({ captainId: id, location: ws.location }));
-              }
-            });
-          });
-    
-        // Set interval to send location every 10 seconds
-        setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ captainId: id, location: ws.location }));
-          }
-        }, 10000);
       }
-    }
-     else if (role === 'user') {
+    } else if (role === 'user') {
       userClients.set(id, ws);
       ws.send(JSON.stringify({ message: 'User added successfully!' }));
-
-      // Find any active (non-cancelled) orders for this user
-      TaxiOrder.find({ user: id, cancelled: false })
-        .sort('-createdAt')
-        .limit(1)
-        .exec((err, orders) => {
-          if (err) return console.error(err);
-          if (orders.length === 0) return;
-
-          let order = orders[0];
-          let captainId = order.captain;
-          let captainWs = captainClients.get(captainId.toString());
-
-          // If the captain's WebSocket is open and the location is known, send the location to the user
-          if (captainWs && captainWs.readyState === WebSocket.OPEN && captainWs.location) {
-            ws.send(JSON.stringify({ captainId: captainId, location: captainWs.location }));
-          }
-        });
-
     } else if (role === 'admin') {
       adminClients.push(ws);
 
       // Send locations of all connected captains to the admin
       let locations = [];
-      for (let [captainId, captainWs] of captainClients.entries()) {
-        if (captainWs.readyState === WebSocket.OPEN && captainWs.location) {
-          locations.push({ captainId: captainId, location: captainWs.location });
+      for (let [captainId, location] of captainLocations.entries()) {
+        let captainWs = captainClients.get(captainId);
+        if (captainWs && captainWs.readyState === WebSocket.OPEN) {
+          locations.push({ captainId: captainId, location: location });
         }
       }
       ws.send(JSON.stringify(locations));
@@ -251,6 +199,7 @@ wss.on('connection', ws => {
     for (let [captainId, captainWs] of captainClients.entries()) {
       if (ws === captainWs) {
         captainClients.delete(captainId);
+        captainLocations.delete(captainId);
       }
     }
     
@@ -261,6 +210,32 @@ wss.on('connection', ws => {
     }
   });
 });
+
+// Interval to send captain locations to user clients every 10 seconds
+setInterval(() => {
+  for (let [userId, userWs] of userClients.entries()) {
+    if (userWs.readyState === WebSocket.OPEN) {
+      // Find the most recent order for this user
+      TaxiOrder.find({ user: userId, cancelled: false })
+        .sort('-createdAt')
+        .limit(1)
+        .exec((err, orders) => {
+          if (err) return console.error(err);
+          if (orders.length === 0) return;
+    
+          let order = orders[0];
+          let captainId = order.captain;
+          let location = captainLocations.get(captainId);
+    
+          // If the location is known, send it to the user
+          if (location) {
+            userWs.send(JSON.stringify({ captainId: captainId, location: location }));
+          }
+        });
+    }
+  }
+}, 10000);
+
 
 
 
