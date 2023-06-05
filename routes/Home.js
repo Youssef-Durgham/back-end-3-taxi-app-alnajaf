@@ -152,8 +152,7 @@ let adminClients = []; // List of admin clients
 
 wss.on('connection', ws => {
   console.log(captainClients, userClients);
-  ws.send(JSON.stringify({ message: 'Connection successful!' }));
-
+  
   ws.on('message', message => {
     let payload = JSON.parse(message);
     const { token } = payload;
@@ -177,32 +176,9 @@ wss.on('connection', ws => {
           }
         });
 
-        // Notify the main user and all passenger users with a recent order associated with this captain
-        TaxiOrder.find({ captain: id, cancelled: false })
-          .sort('-createdAt')
-          .limit(1)
-          .exec((err, orders) => {
-            if (err) return console.error(err);
-            if (orders.length === 0) return;
-
-            let order = orders[0];
-
-            // Send location to main user
-            let userId = order.user;
-            let userWs = userClients.get(userId.toString());
-            if (userWs && userWs.readyState === WebSocket.OPEN) {
-              userWs.send(JSON.stringify({ captainId: id, location: ws.location }));
-            }
-
-            // Send location to all passengers
-            order.passengers.forEach(passenger => {
-              let passengerUserWs = userClients.get(passenger.user.toString());
-              if (passengerUserWs && passengerUserWs.readyState === WebSocket.OPEN) {
-                passengerUserWs.send(JSON.stringify({ captainId: id, location: ws.location }));
-              }
-            });
-          });
-
+        // Send location to main user and passenger users of the captain's order
+        sendCaptainLocationToUsers(id, ws.location);
+        
         // Clear the previous interval, if any
         if (ws.locationInterval) {
           clearInterval(ws.locationInterval);
@@ -270,6 +246,34 @@ wss.on('connection', ws => {
     }
   });
 });
+
+function sendCaptainLocationToUsers(captainId, location) {
+  TaxiOrder.find({ captain: captainId, cancelled: false })
+    .sort('-createdAt')
+    .limit(1)
+    .exec((err, orders) => {
+      if (err) return console.error(err);
+      if (orders.length === 0) return;
+
+      let order = orders[0];
+
+      // Send location to main user
+      let userId = order.user;
+      let userWs = userClients.get(userId.toString());
+      if (userWs && userWs.readyState === WebSocket.OPEN) {
+        userWs.send(JSON.stringify({ captainId: captainId, location: location }));
+      }
+
+      // Send location to all passengers
+      order.passengers.forEach(passenger => {
+        let passengerUserWs = userClients.get(passenger.user.toString());
+        if (passengerUserWs && passengerUserWs.readyState === WebSocket.OPEN) {
+          passengerUserWs.send(JSON.stringify({ captainId: captainId, location: location }));
+        }
+      });
+    });
+}
+
 
 
 
